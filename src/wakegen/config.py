@@ -83,7 +83,7 @@ class Case:
     # Both are fixed by the finite-difference check in phase 0.
     adjoint_scale: float = 1.0
     adjoint_times_volume: bool = True
-    adjoint_column: str = ".*adjoint.*"  # regex for the adjoint momentum column names, before [i]/[j]/[k]
+    adjoint_column: str = ".*velocityadjoint"  # regex (lower case) for the adjoint velocity column, before [i]/[j]/[k]; STAR 21.04 names it "Adjoint<n>::VelocityAdjoint"
 
     # ------------------------------------------------------------------
     @property

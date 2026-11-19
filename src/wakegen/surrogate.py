@@ -22,7 +22,7 @@ from .tables import read_table, write_table
 _CELL_HEADER = ['"X (m)"', '"Y (m)"', '"Z (m)"', '"Volume (m^3)"']
 _VELOCITY = ['"Velocity[i] (m/s)"', '"Velocity[j] (m/s)"', '"Velocity[k] (m/s)"']
 # Placeholder name; the real STAR-CCM+ field-function name is fixed in phase 0.
-_ADJOINT = ['"Adjoint of Cost w.r.t. Momentum[i]"', '"Adjoint of Cost w.r.t. Momentum[j]"', '"Adjoint of Cost w.r.t. Momentum[k]"']
+_ADJOINT = ['"Adjoint1::VelocityAdjoint[i]"', '"Adjoint1::VelocityAdjoint[j]"', '"Adjoint1::VelocityAdjoint[k]"']  # STAR 21.04 name
 
 
 def _disk_points(r_max: float, spacing: float) -> np.ndarray:
