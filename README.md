@@ -138,6 +138,18 @@ integral of an indicator times `(u_x - c)^2`) has to answer:
    compare the change in J with the adjoint's prediction. This fixes
    `adjoint_scale` (sign and factor) and `adjoint_times_volume`.
 
+The test is `java/star/AdjointProbe.java` (settings in `java/star/probe.properties`).
+Copy both into an empty folder and run, without `-power` if there is no Power licence:
+
+```
+"C:\Program Files\Siemens\21.04.008\STAR-CCM+21.04.008\star\bin\starccm+.bat" -batch AdjointProbe.java -new -np 8 -licpath 1999@hpcswkrilic01
+```
+
+It writes `probe_result.properties` (J, finite-difference dJ/dA, the adjoint prediction for
+every adjoint field function and their ratios), `probe_log.csv`, `adjoint_probe_cells.csv`,
+`probe_primal.sim` and `probe_adjoint.sim`. Send these plus the STAR log. Compile check
+without STAR: `java\star\compile_check.bat` (needs JDK 25).
+
 If 2 or 4 fails, the same Python core can be driven by a response-matrix method
 in STAR-CCM+ or by an adjoint in OpenFOAM instead.
 
