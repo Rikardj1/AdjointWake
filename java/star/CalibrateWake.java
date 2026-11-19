@@ -305,10 +305,14 @@ public class CalibrateWake extends StarMacro {
         table.setFieldFunctions(columns);
         table.extract();
         File out = caseFile(name);
-        File tmp = caseFile(name + ".tmp");
+        // STAR picks the export format from the extension, so the temporary file must end in .csv
+        File tmp = caseFile(name.replaceAll("\\.csv$", "") + "_partial.csv");
         table.export(tmp.getPath(), ",");
         if (out.exists() && !out.delete()) {
             throw new IllegalStateException("cannot replace " + out);
+        }
+        if (!tmp.exists()) {
+            throw new IllegalStateException("STAR wrote no " + tmp + " (see the export error above)");
         }
         if (!tmp.renameTo(out)) {
             throw new IllegalStateException("cannot rename " + tmp + " to " + out);
