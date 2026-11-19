@@ -311,6 +311,22 @@ public class CalibrateWake extends StarMacro {
         targetPart = threshold("Wake target cells", target);
     }
 
+    /**
+     * Scalar user field functions for the three components of a vector field. An XyzInternalTable
+     * only takes scalar field functions; the columns come out as label_x, label_y, label_z, which
+     * wakegen reads as the vector "label".
+     */
+    private List<FieldFunction> components(FieldFunction vector, String label) {
+        List<FieldFunction> out = new ArrayList<FieldFunction>();
+        String[] axis = {"x", "y", "z"};
+        for (int i = 0; i < 3; i++) {
+            // the presentation name is the column header; fieldFunction() finds it again on the next export
+            out.add(fieldFunction(label + "_" + axis[i], FieldFunctionTypeOption.Type.SCALAR,
+                    "$${" + vector.getFunctionName() + "}[" + i + "]"));
+        }
+        return out;
+    }
+
     /** Write X, Y, Z, Volume and the extra field functions of the cells of a threshold part. */
     private void exportCells(ThresholdPart part, String name, List<FieldFunction> extra) {
         String tableName = "Export " + name;
@@ -327,16 +343,7 @@ public class CalibrateWake extends StarMacro {
         }
         List<FieldFunction> columns = new ArrayList<FieldFunction>();
         columns.add(sim.getFieldFunctionManager().getFunction("Volume"));
-        for (FieldFunction ff : extra) {
-            // XyzInternalTable takes scalar field functions only: export a vector as its [i], [j], [k] components
-            if (ff.getTypeAsEnum() != FieldFunctionTypeOption.Type.SCALAR) {
-                for (int i = 0; i < 3; i++) {
-                    columns.add(ff.getComponentFunction(i));
-                }
-            } else {
-                columns.add(ff);
-            }
-        }
+        columns.addAll(extra);
         table.setFieldFunctions(columns);
         table.extract();
         File out = caseFile(name);
@@ -478,8 +485,7 @@ public class CalibrateWake extends StarMacro {
         }
 
         @Override protected void exportAchieved() {
-            exportCells(targetPart, "achieved_cells.csv",
-                    Collections.<FieldFunction>singletonList(sim.getFieldFunctionManager().getFunction("Velocity")));
+            exportCells(targetPart, "achieved_cells.csv", components(sim.getFieldFunctionManager().getFunction("Velocity"), "Velocity"));
         }
 
         @Override protected void solveAdjoint() {
@@ -487,7 +493,7 @@ public class CalibrateWake extends StarMacro {
         }
 
         @Override protected void exportAdjoint() {
-            exportCells(controlPart, "adjoint_cells.csv", Collections.<FieldFunction>singletonList(adjointField));
+            exportCells(controlPart, "adjoint_cells.csv", components(adjointField, "VelocityAdjoint"));
             sim.saveState(caseFile("calibration.sim").getPath());
         }
 
