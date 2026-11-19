@@ -51,8 +51,9 @@ component in the report.
 concentric rings around the shaft axis (see `examples/WakeEdStar.csv`: 6 rings
 of 31 points). X is the shaft axis pointing downstream. The file's axes are used
 as the simulation's laboratory axes, so there is no angle or sign convention to
-set. Coordinates are scaled to metres with `wake_coord_scale`; velocities are
-V/Vs when `wake_velocity_normalised = true`.
+set. Coordinates are scaled to metres with `wake_coord_scale` (the diameter, if the
+file is non-dimensional with D = 1); velocities are V/Vs when
+`wake_velocity_normalised = true`.
 
 ## Quick start
 
@@ -80,7 +81,8 @@ javac -d build java/WakeLoop.java java/DryRunLoop.java
 mkdir -p dry && cp examples/case.properties examples/WakeEdStar.csv dry/ && java -cp build DryRunLoop dry/case.properties python3 "$PWD/src" 0.06
 ```
 
-`examples/case.properties` has `ship_speed = 5.0` as a placeholder.
+`examples/case.properties` is the full-scale case: D = 6.0 m, Vs = 24 knots. The wake file is
+non-dimensional with D = 1.0 m, hence `wake_coord_scale = 6.0`.
 
 ## File protocol between the macro and Python
 

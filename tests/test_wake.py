@@ -16,7 +16,7 @@ def table():
 def test_example_file_has_six_rings_of_31_points(table):
     assert len(table.rings) == 6
     assert [len(r.theta) for r in table.rings] == [31] * 6
-    np.testing.assert_allclose(table.radii / 0.472, [0.35, 0.5, 0.65, 0.85, 1.0, 1.15], atol=2e-3)
+    np.testing.assert_allclose(table.radii / 0.5, [0.331, 0.472, 0.614, 0.803, 0.944, 1.086], atol=1e-4)  # file is for D = 1
     for ring in table.rings:
         assert np.all(np.diff(ring.theta) > 0) and ring.theta[0] >= 0 and ring.theta[-1] < 2 * np.pi
 
@@ -61,6 +61,13 @@ def test_polar_unit_vectors_are_orthonormal():
     np.testing.assert_allclose(np.einsum("nc,nc->n", e_r, e_t), 0, atol=1e-15)
     np.testing.assert_allclose(e_r[0], [0, 0, 1])  # theta = 0 is +Z
     np.testing.assert_allclose(e_t[0], [0, 1, 0])  # increasing theta turns towards +Y
+
+
+def test_example_case_is_full_scale(case, case_dir):
+    problem = Problem(case, case_dir)
+    assert case.diameter == 6.0 and case.ship_speed == pytest.approx(24 * 0.514444, rel=1e-5)
+    np.testing.assert_allclose(problem.table.radii / case.radius, [0.331, 0.472, 0.614, 0.803, 0.944, 1.086], atol=1e-4)
+    assert problem.table.rings[0].velocity[:, 0].max() == pytest.approx(0.9492 * case.ship_speed, rel=1e-6)
 
 
 def test_crossflow_goes_into_the_inflow_vector(case, case_dir):

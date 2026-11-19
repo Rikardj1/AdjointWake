@@ -58,7 +58,7 @@ def solve(case: Case, case_dir: str | Path, blur: float, adjoint: bool = True) -
 
     _, forces = read_table(case_dir / "forces_table.csv")
     names, cells = read_table(case_dir / "control_cells.csv")
-    if not np.allclose(forces[:, :3], cells[:, :3], atol=1e-9):
+    if not np.allclose(forces[:, :3], cells[:, :3], atol=1e-8 * case.diameter):
         raise ValueError("forces_table.csv is not on the control cells")
     volume = cells[:, 3]
     # column-integrated force per unit area: sum over x of f V, per (y, z) column
