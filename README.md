@@ -12,7 +12,7 @@ flow solver.
 |---|---|
 | Python core (wake reader, target field, force parametrisation, cost, L-BFGS, file protocol, report) | Written, 27 tests pass |
 | `java/WakeLoop.java` (solver-independent loop driver) | Written, tested against the Python side with a plain JDK |
-| STAR-CCM+ macros (`AdjointProbe`, `CalibrateWake`, `ApplyWakeForces`) | **Not written.** The 21.04 Javadoc and jars are now reachable, see [docs/STAR_API_ACCESS.md](docs/STAR_API_ACCESS.md) |
+| STAR-CCM+ macros | `AdjointProbe` ran (phase 0 passed). `CalibrateWake` written and compile-checked, not run yet. `ApplyWakeForces` not written. API access: [docs/STAR_API_ACCESS.md](docs/STAR_API_ACCESS.md) |
 | Any run in STAR-CCM+ | Phase 0 (`AdjointProbe`) passed 2026-11-19, see below |
 
 The dry run below uses a simple stand-in for the flow solver. It shows that the
@@ -165,6 +165,25 @@ The response is close to linear in this test: the second-order term J'' dA^2/2 i
 
 If 2 or 4 fails, the same Python core can be driven by a response-matrix method
 in STAR-CCM+ or by an adjoint in OpenFOAM instead.
+
+## Calibration in STAR-CCM+
+
+Put `case.properties`, the wake file and `java/star/CalibrateWake.java` in one folder. Set
+`python` and `wakegen_path` in `case.properties` (for a clone in `C:\Programs\Repo\AdjointWake`:
+`wakegen_path = C:\Programs\Repo\AdjointWake\src`, and `pip install numpy matplotlib` once), then:
+
+```
+& "C:\Program Files\Siemens\21.04.008\STAR-CCM+21.04.008\star\bin\starccm+.bat" -batch CalibrateWake.java -new -np 8 -licpath 1999@hpcswkrilic01
+```
+
+The macro builds a cylinder around the propeller plane (no propeller, no hub), meshes it with a
+fine zone from the force disk to the propeller plane, writes the cell files, runs `wakegen
+prepare`, and then loops flow solve, adjoint solve and `wakegen step` until the optimiser stops;
+`wakegen report` writes the achieved wake. `history.csv` shows the progress. `calibration.sim`
+is saved after every adjoint solve; open it and run the macro again without `-new` to continue.
+The macro's own settings (domain, cell sizes, iterations) are at the end of
+`examples/case.properties`. `java/WakeLoop.java` is embedded in the macro: after changing it,
+run `python tools/embed_wakeloop.py`.
 
 ## Using the result in the propeller simulation
 
