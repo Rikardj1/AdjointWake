@@ -13,7 +13,7 @@ flow solver.
 | Python core (wake reader, target field, force parametrisation, cost, L-BFGS, file protocol, report) | Written, 27 tests pass |
 | `java/WakeLoop.java` (solver-independent loop driver) | Written, tested against the Python side with a plain JDK |
 | STAR-CCM+ macros (`AdjointProbe`, `CalibrateWake`, `ApplyWakeForces`) | **Not written.** The 21.04 Javadoc and jars are now reachable, see [docs/STAR_API_ACCESS.md](docs/STAR_API_ACCESS.md) |
-| Any run in STAR-CCM+ | **Not done** |
+| Any run in STAR-CCM+ | Phase 0 (`AdjointProbe`) passed 2026-11-19, see below |
 
 The dry run below uses a simple stand-in for the flow solver. It shows that the
 loop, the gradient chain and the files work. It says nothing about how well a
@@ -151,6 +151,17 @@ It writes `probe_result.properties` (J, finite-difference dJ/dA, the adjoint pre
 every adjoint field function and their ratios), `probe_log.csv`, `adjoint_probe_cells.csv`,
 `probe_primal.sim` and `probe_adjoint.sim`. Send these plus the STAR log. Compile check
 without STAR: `java\star\compile_check.bat` (needs JDK 25).
+
+### Phase 0 result (STAR-CCM+ 21.04.008, 2026-11-19)
+
+| Question | Answer |
+|---|---|
+| 1. Classes and field functions | Adjoint flow only with coupled flow. Per cost function STAR creates `Adjoint<n>::VelocityAdjoint` (vector) and `Adjoint<n>::CoordSensitivity`. |
+| 2. Cost function | A `ReportCostFunction` on a `VolumeIntegralReport` of a user field function works. A target read from a table with `interpolatePositionTable(@Table(...), "utx")` gives the same J and the same adjoint (cost B = cost A to all digits). |
+| 3. Turbulence | Runs with SST k-omega and frozen turbulence on coupled flow. |
+| 4. Finite differences | Central difference (2 % force step) / volume integral of `VelocityAdjoint[0] * g` = **1.0006**; the plain cell sum is off by 5e5. So `adjoint_scale = 1`, `adjoint_times_volume = true`, `adjoint_column = .*velocityadjoint`. |
+
+The response is close to linear in this test: the second-order term J'' dA^2/2 is about 1 % of the first-order change J' dA for a 2 % force step.
 
 If 2 or 4 fails, the same Python core can be driven by a response-matrix method
 in STAR-CCM+ or by an adjoint in OpenFOAM instead.
