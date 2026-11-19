@@ -18,20 +18,20 @@ if exist "%STARJARS%\*.jar" set "CP=%STARJARS%\*"
 for /d /r "%STARJARS%" %%d in (*) do (
   if exist "%%d\*.jar" set "CP=!CP!;%%d\*"
 )
+if "!CP:~0,1!"==";" set "CP=!CP:~1!"
 set "CP=!CP:\=/!"
 set "OUTF=%OUT:\=/%"
 > "%ARGS%" echo -proc:none
 >> "%ARGS%" echo -nowarn
 >> "%ARGS%" echo -d
 >> "%ARGS%" echo "%OUTF%"
->> "%ARGS%" echo -cp
->> "%ARGS%" echo "!CP!"
+rem javac does not expand folder/* class path wildcards inside an @argfile, so -cp goes on the command line
 if "%~1"=="" (
   for %%f in (*.java) do >> "%ARGS%" echo "%%f"
 ) else (
   for %%f in (%*) do >> "%ARGS%" echo "%%~f"
 )
-"%JDK25%\bin\javac.exe" @"%ARGS%"
+"%JDK25%\bin\javac.exe" -cp "!CP!" @"%ARGS%"
 set "RC=%ERRORLEVEL%"
 popd
 if "%RC%"=="0" (echo COMPILE_OK) else (echo COMPILE_FAILED %RC%)

@@ -33,7 +33,8 @@ import star.meshing.*;
  * probe_primal.sim, probe_adjoint.sim. Log markers: PROBE_MESH, PROBE_J, PROBE_ADJOINT_FF,
  * PROBE_FD, PROBE_COMPLETE, PROBE_FAILED.
  *
- * Written against the STAR-CCM+ 21.04.008 jars (compile-checked); not yet run in STAR.
+ * The cost functions are ReportCostFunction on a VolumeIntegralReport (VolumeIntegralCostFunction is
+ * deprecated in 21.04). Compile-checked against the STAR-CCM+ 21.04.008 jars; not yet run in STAR.
  */
 public class AdjointProbe extends StarMacro {
 
@@ -83,7 +84,7 @@ public class AdjointProbe extends StarMacro {
     private Region region;
     private UserFieldFunction forceFunction;
     private VolumeIntegralReport costA, costB;
-    private VolumeIntegralCostFunction costFunctionA, costFunctionB;
+    private ReportCostFunction costFunctionA, costFunctionB;
     private String blobShape;
 
     private void run() throws Exception {
@@ -301,9 +302,9 @@ public class AdjointProbe extends StarMacro {
                 "$ProbeCostMask*pow($$Velocity[0]-(" + f(U) + "),2)");
         costA = volumeIntegral("Probe cost A", sim.getFieldFunctionManager().getFunction("ProbeCostA"));
         AdjointSolver adjoint = sim.getSolverManager().getSolver(AdjointSolver.class);
-        costFunctionA = adjoint.getAdjointCostFunctionManager().createAdjointCostFunction(VolumeIntegralCostFunction.class);
+        costFunctionA = adjoint.getAdjointCostFunctionManager().createAdjointCostFunction(ReportCostFunction.class);
         costFunctionA.setPresentationName("Probe cost A");
-        costFunctionA.setVolumeIntegralReport(costA);
+        costFunctionA.setReport(costA);
 
         // Cost B: the same target, read from a table (tests a table-driven target).
         try {
@@ -314,9 +315,9 @@ public class AdjointProbe extends StarMacro {
             fieldFunction("ProbeCostB", FieldFunctionTypeOption.Type.SCALAR,
                     "$ProbeCostMask*pow($$Velocity[0]-" + lookup + ",2)");
             costB = volumeIntegral("Probe cost B", sim.getFieldFunctionManager().getFunction("ProbeCostB"));
-            costFunctionB = adjoint.getAdjointCostFunctionManager().createAdjointCostFunction(VolumeIntegralCostFunction.class);
+            costFunctionB = adjoint.getAdjointCostFunctionManager().createAdjointCostFunction(ReportCostFunction.class);
             costFunctionB.setPresentationName("Probe cost B");
-            costFunctionB.setVolumeIntegralReport(costB);
+            costFunctionB.setReport(costB);
         } catch (Exception e) {
             sim.println("PROBE_COST_B_FAILED " + e);
             costB = null;
