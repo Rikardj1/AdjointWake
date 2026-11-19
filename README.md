@@ -12,7 +12,7 @@ flow solver.
 |---|---|
 | Python core (wake reader, target field, force parametrisation, cost, L-BFGS, file protocol, report) | Written, 27 tests pass |
 | `java/WakeLoop.java` (solver-independent loop driver) | Written, tested against the Python side with a plain JDK |
-| STAR-CCM+ macros (`AdjointProbe`, `CalibrateWake`, `ApplyWakeForces`) | **Not written.** They need the 21.04 Javadoc, which was not reachable when this was built |
+| STAR-CCM+ macros (`AdjointProbe`, `CalibrateWake`, `ApplyWakeForces`) | **Not written.** The 21.04 Javadoc and jars are now reachable, see [docs/STAR_API_ACCESS.md](docs/STAR_API_ACCESS.md) |
 | Any run in STAR-CCM+ | **Not done** |
 
 The dry run below uses a simple stand-in for the flow solver. It shows that the
