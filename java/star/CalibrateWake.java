@@ -140,7 +140,7 @@ public class CalibrateWake extends StarMacro {
         costReport = (VolumeIntegralReport) sim.getReportManager().getReport("Wake cost");
         AdjointSolver adjoint = sim.getSolverManager().getSolver(AdjointSolver.class);
         costFunction = (ReportCostFunction) adjoint.getAdjointCostFunctionManager().getAdjointCostFunction("Wake cost");
-        for (Table t : sim.getTableManager().getObjects()) {
+        for (Table t : sim.getTableManager().getTables()) {
             if (t.getPresentationName().startsWith("WakeForces_")) {
                 forcesTable = t;
                 tableCount = Math.max(tableCount, Integer.parseInt(t.getPresentationName().substring(11)));
@@ -186,7 +186,7 @@ public class CalibrateWake extends StarMacro {
         domain.rebuildSimpleShapePart();
         domain.getPartSurfaceManager().splitPartSurfacesByAngle(domain.getPartSurfaceManager().getPartSurfaces(), 45);
         sim.getRegionManager().newRegionsFromParts(Collections.<GeometryPart>singletonList(domain), "OneRegion", null,
-                "OneBoundaryPerPartSurface", null, "OneFeatureCurve", null, RegionManager.CreateInterfaceMode.BOUNDARY);
+                "OneBoundaryPerPartSurface", null, RegionManager.CreateInterfaceMode.BOUNDARY);
         region = sim.getRegionManager().getRegions().iterator().next();
         region.setPresentationName(REGION);
         region.setPhysicsContinuum(physics);
@@ -289,13 +289,13 @@ public class CalibrateWake extends StarMacro {
     private void exportCells(ThresholdPart part, String name, List<FieldFunction> extra) {
         String tableName = "Export " + name;
         XyzInternalTable table = null;
-        for (Table t : sim.getTableManager().getObjects()) {
+        for (Table t : sim.getTableManager().getTables()) {
             if (t.getPresentationName().equals(tableName) && t instanceof XyzInternalTable) {
                 table = (XyzInternalTable) t;
             }
         }
         if (table == null) {
-            table = sim.getTableManager().createTable(XyzInternalTable.class);
+            table = sim.getTableManager().createTabularObject(XyzInternalTable.class);
             table.setPresentationName(tableName);
             table.getParts().setObjects(part);
         }
