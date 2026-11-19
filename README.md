@@ -145,6 +145,8 @@ Copy both into an empty folder and run, without `-power` if there is no Power li
 "C:\Program Files\Siemens\21.04.008\STAR-CCM+21.04.008\star\bin\starccm+.bat" -batch AdjointProbe.java -new -np 8 -licpath 1999@hpcswkrilic01
 ```
 
+In PowerShell, put `& ` in front of the quoted path.
+
 It writes `probe_result.properties` (J, finite-difference dJ/dA, the adjoint prediction for
 every adjoint field function and their ratios), `probe_log.csv`, `adjoint_probe_cells.csv`,
 `probe_primal.sim` and `probe_adjoint.sim`. Send these plus the STAR log. Compile check
