@@ -11,16 +11,19 @@ from pathlib import Path
 
 
 def read_properties(path: str | Path) -> dict[str, str]:
-    """Parse ``key = value`` lines. ``#`` and ``!`` start a comment line."""
+    """Parse ``key = value`` lines. ``#`` and ``!`` start a comment line; no escapes, surrounding quotes are removed."""
     out: dict[str, str] = {}
-    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+    for raw in Path(path).read_text(encoding="utf-8-sig").splitlines():  # -sig: Notepad may add a BOM
         line = raw.strip()
         if not line or line[0] in "#!":
             continue
         if "=" not in line:
             raise ValueError(f"{path}: line without '=': {raw!r}")
         key, value = line.split("=", 1)
-        out[key.strip()] = value.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]:
+            value = value[1:-1]  # "C:\path with spaces" -> C:\path with spaces
+        out[key.strip()] = value
     return out
 
 

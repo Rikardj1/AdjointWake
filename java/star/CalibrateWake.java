@@ -84,14 +84,40 @@ public class CalibrateWake extends StarMacro {
         sim = getActiveSimulation();
         try {
             caseFile = new File(resolvePath("case.properties")).getAbsoluteFile();
-            try (Reader in = new FileReader(caseFile)) {
-                cfg.load(in);
-            }
+            cfg.putAll(readPlain(caseFile));
             run();
         } catch (Exception e) {
             sim.println("WAKE_FAILED: " + e);
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * key = value lines, read like wakegen's read_properties: no escape characters, so Windows paths
+     * keep their backslashes; surrounding quotes are removed; # and ! start a comment line.
+     */
+    private static Properties readPlain(File file) throws IOException {
+        Properties out = new Properties();
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+            String raw;
+            while ((raw = in.readLine()) != null) {
+                String line = raw.trim();
+                if (line.startsWith("\uFEFF")) {
+                    line = line.substring(1).trim();
+                }
+                if (line.isEmpty() || line.charAt(0) == '#' || line.charAt(0) == '!' || line.indexOf('=') < 0) {
+                    continue;
+                }
+                int eq = line.indexOf('=');
+                String value = line.substring(eq + 1).trim();
+                if (value.length() >= 2 && (value.charAt(0) == '"' || value.charAt(0) == '\'')
+                        && value.charAt(value.length() - 1) == value.charAt(0)) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                out.setProperty(line.substring(0, eq).trim(), value);
+            }
+        }
+        return out;
     }
 
     private File caseFile(String name) {
@@ -320,10 +346,7 @@ public class CalibrateWake extends StarMacro {
     }
 
     private void setInflow() throws IOException {
-        Properties inlet = new Properties();
-        try (Reader in = new FileReader(caseFile("inlet.properties"))) {
-            inlet.load(in);
-        }
+        Properties inlet = readPlain(caseFile("inlet.properties"));
         double vx = Double.parseDouble(inlet.getProperty("inlet_vx").trim());
         double vy = Double.parseDouble(inlet.getProperty("inlet_vy").trim());
         double vz = Double.parseDouble(inlet.getProperty("inlet_vz").trim());
