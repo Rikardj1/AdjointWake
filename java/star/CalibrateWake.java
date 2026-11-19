@@ -327,7 +327,16 @@ public class CalibrateWake extends StarMacro {
         }
         List<FieldFunction> columns = new ArrayList<FieldFunction>();
         columns.add(sim.getFieldFunctionManager().getFunction("Volume"));
-        columns.addAll(extra);
+        for (FieldFunction ff : extra) {
+            // XyzInternalTable takes scalar field functions only: export a vector as its [i], [j], [k] components
+            if (ff.getTypeAsEnum() != FieldFunctionTypeOption.Type.SCALAR) {
+                for (int i = 0; i < 3; i++) {
+                    columns.add(ff.getComponentFunction(i));
+                }
+            } else {
+                columns.add(ff);
+            }
+        }
         table.setFieldFunctions(columns);
         table.extract();
         File out = caseFile(name);
