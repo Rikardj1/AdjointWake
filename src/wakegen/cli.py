@@ -53,6 +53,7 @@ def cmd_info(args) -> int:
     problem = _problem(args)
     case, table = problem.case, problem.table
     print(f"wake file      : {case.wake_file}")
+    print(f"coordinates    : file * {case.wake_scale:.6g} = metres")
     print(f"rings          : {len(table.rings)}, points per ring {[len(r.theta) for r in table.rings]}")
     print("r/R            : " + ", ".join(f"{r / case.radius:.3f}" for r in table.radii))
     mean = problem.wake_mean / case.ship_speed
@@ -65,7 +66,7 @@ def cmd_info(args) -> int:
     print(f"cost region    : x = {case.prop_plane_x:.4g} m, {problem.region.r_min:.4g} <= r <= {problem.region.r_max:.4g} m")
     ratio = table.r_max / case.radius
     if not 0.8 <= ratio <= 1.5:
-        print(f"WARNING: outermost wake radius is {ratio:.2f} R; check diameter and wake_coord_scale")
+        print(f"WARNING: outermost wake radius is {ratio:.2f} R; check diameter and wake_diameter")
     return 0
 
 
@@ -74,7 +75,7 @@ def cmd_prepare(args) -> int:
     ratio = problem.table.r_max / problem.case.radius
     if not 0.8 <= ratio <= 1.5 and not args.allow_scale:
         print(f"ERROR: the outermost wake ring is at {ratio:.2f} R (expected about 1.0-1.2 R); check diameter "
-              f"and wake_coord_scale, or pass --allow-scale", file=sys.stderr)
+              f"and wake_diameter, or pass --allow-scale", file=sys.stderr)
         return 2
     free = problem.freestream
     write_properties(problem.dir / "inlet.properties", {
@@ -193,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         if name == "prepare":
             p.add_argument("--start", choices=("analytic", "zero"), default="analytic")
             p.add_argument("--allow-scale", action="store_true",
-                           help="run although the wake rings do not reach about R (diameter / wake_coord_scale)")
+                           help="run although the wake rings do not reach about R (diameter / wake_diameter)")
     p = sub.add_parser("apply")
     p.add_argument("--forces", default="wake_forces.json")
     p.add_argument("--cells", required=True, help="CSV with X, Y, Z, Volume of the cells around the force disk")

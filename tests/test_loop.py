@@ -149,6 +149,7 @@ def test_apply_puts_the_forces_on_another_mesh_and_scales_with_speed(case_dir, t
 
 
 def test_clear_errors_for_bad_input(case_dir, capsys):
+    (case_dir / "case.properties").write_text((case_dir / "case.properties").read_text().replace("wake_diameter = 1.0", "wake_diameter = 0"))
     (case_dir / "case.properties").write_text((case_dir / "case.properties").read_text().replace("diameter = 0.944", "diameter = 0.5"))
     assert run(case_dir, "info") == 2
     assert "force disk" in capsys.readouterr().err

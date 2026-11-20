@@ -55,6 +55,18 @@ def test_units_and_scaling():
     assert table.rings[0].velocity[:, 0].max() == pytest.approx(5 * 0.9492, rel=1e-6)
 
 
+def test_wake_file_for_another_diameter_is_scaled_to_the_propeller(case_dir):
+    from wakegen.config import Case
+
+    text = (case_dir / "case.properties").read_text()
+    for diameter in (0.944, 6.0):
+        (case_dir / "case.properties").write_text(text.replace("diameter = 0.944", f"diameter = {diameter}"))
+        case = Case.from_properties(case_dir / "case.properties")
+        assert case.wake_diameter == 1.0 and case.wake_scale == pytest.approx(diameter)
+        problem = Problem(case, case_dir)
+        assert problem.table.r_max / case.radius == pytest.approx(0.543 / 0.5, rel=1e-4)
+
+
 def test_polar_unit_vectors_are_orthonormal():
     y, z = np.array([0.0, 0.3, -0.2]), np.array([0.5, 0.1, -0.4])
     e_r, e_t = polar_unit_vectors(y, z)

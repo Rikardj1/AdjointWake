@@ -83,7 +83,7 @@ def write_report(problem: Problem, rep: dict, stem: str = "wake_achieved") -> li
     out_dir = problem.dir
     written = []
 
-    coords = np.column_stack([np.full_like(rep["y"], 0.0), rep["y"], rep["z"]]) / case.wake_coord_scale
+    coords = np.column_stack([np.full_like(rep["y"], 0.0), rep["y"], rep["z"]]) / case.wake_scale
     csv_path = out_dir / f"{stem}.csv"
     np.savetxt(csv_path, np.column_stack([coords, rep["achieved"]]), delimiter=",", header="X,Y,Z,Vx,Vy,Vz", comments="", fmt="%.6g")
     written.append(csv_path)
