@@ -101,7 +101,7 @@ All files live next to `case.properties`.
 | `adjoint_cells.csv` | macro, after each adjoint solve | `X, Y, Z, Volume`, adjoint momentum `[i],[j],[k]` of the control cells |
 | `state.npz`, `history.csv` | `step` | optimiser state (restartable) and log |
 | `wake_forces.json` | `step` | best force field so far; the deliverable |
-| `wake_achieved.csv`, `_summary.txt`, `_cuts.png` | `report` | achieved wake in the input format, errors, plots |
+| `wake_achieved.csv`, `_summary.txt`, `_cuts.png` | `report` | achieved wake in the input format plus `Vt`, `Vr` (tangential along θ from +Z towards +Y, radial outwards), errors, plots |
 
 Headers are matched by pattern after removing quotes and units, so STAR's
 `"X (m)"` and `"Velocity[i] (m/s)"` are accepted. The adjoint columns are found

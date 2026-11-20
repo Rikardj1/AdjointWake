@@ -67,7 +67,7 @@ def build_report(problem: Problem, achieved_file: str = "achieved_cells.csv") ->
             "floor": np.sqrt(np.mean(floor[sel] ** 2, axis=0)).tolist(),
         })
     return {
-        "y": y, "z": z,
+        "y": y, "z": z, "e_t": e_t, "e_r": e_r,
         "target": target / scale, "achieved": achieved / scale,
         "error": comp,  # axial, tangential, radial, in fractions of Vs
         "rms": np.sqrt(np.mean(comp**2, axis=0)).tolist(),
@@ -77,15 +77,23 @@ def build_report(problem: Problem, achieved_file: str = "achieved_cells.csv") ->
     }
 
 
+def _with_polar(rep: dict, velocity: np.ndarray) -> np.ndarray:
+    """Append Vt (along increasing theta, from +Z towards +Y) and Vr (outwards) to (Vx, Vy, Vz)."""
+    vt = np.einsum("nc,nc->n", velocity, rep["e_t"])
+    vr = np.einsum("nc,nc->n", velocity, rep["e_r"])
+    return np.column_stack([velocity, vt, vr])
+
+
 def write_report(problem: Problem, rep: dict, stem: str = "wake_achieved") -> list[Path]:
-    """Achieved wake in the input format, a text summary, and plots if matplotlib is present."""
+    """Achieved wake in the input format plus Vt and Vr, a text summary, and plots if matplotlib is present."""
     case = problem.case
     out_dir = problem.dir
     written = []
 
     coords = np.column_stack([np.full_like(rep["y"], 0.0), rep["y"], rep["z"]]) / case.wake_scale
+    target, achieved = _with_polar(rep, rep["target"]), _with_polar(rep, rep["achieved"])
     csv_path = out_dir / f"{stem}.csv"
-    np.savetxt(csv_path, np.column_stack([coords, rep["achieved"]]), delimiter=",", header="X,Y,Z,Vx,Vy,Vz", comments="", fmt="%.6g")
+    np.savetxt(csv_path, np.column_stack([coords, achieved]), delimiter=",", header="X,Y,Z,Vx,Vy,Vz,Vt,Vr", comments="", fmt="%.6g")
     written.append(csv_path)
 
     lines = [
@@ -111,17 +119,17 @@ def write_report(problem: Problem, rep: dict, stem: str = "wake_achieved") -> li
     except ImportError:
         return written
 
-    names = ["Va/Vs", "Vy/Vs", "Vz/Vs"]
-    fig, axes = plt.subplots(len(problem.table.rings), 3, figsize=(13, 2.2 * len(problem.table.rings)), sharex=True, squeeze=False)
+    names = ["Va/Vs", "Vy/Vs", "Vz/Vs", "Vt/Vs", "Vr/Vs"]
+    fig, axes = plt.subplots(len(problem.table.rings), len(names), figsize=(20, 2.2 * len(problem.table.rings)), sharex=True, squeeze=False)
     radius = np.hypot(rep["y"], rep["z"])
     theta = np.degrees(np.mod(np.arctan2(rep["y"], rep["z"]), 2 * np.pi))
     for row, ring in enumerate(problem.table.rings):
         sel = np.isclose(radius, ring.radius, rtol=1.0e-6)
         order = np.argsort(theta[sel])
-        for c in range(3):
+        for c in range(len(names)):
             ax = axes[row, c]
-            ax.plot(theta[sel][order], rep["target"][sel][order, c], "k-", label="target")
-            ax.plot(theta[sel][order], rep["achieved"][sel][order, c], "C3--", label="achieved")
+            ax.plot(theta[sel][order], target[sel][order, c], "k-", label="target")
+            ax.plot(theta[sel][order], achieved[sel][order, c], "C3--", label="achieved")
             ax.grid(alpha=0.3)
             if c == 0:
                 ax.set_ylabel(f"r/R = {ring.radius / case.radius:.2f}")
