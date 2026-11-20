@@ -44,7 +44,8 @@ class Case:
 
     # --- target wake file (X,Y,Z,Vx,Vy,Vz point cloud in the propeller plane) ---
     wake_file: str = "wake.csv"
-    wake_coord_scale: float = 1.0  # file coordinates * scale = metres
+    wake_diameter: float = 0.0  # > 0: the file is for a propeller of this diameter [m]; coordinates are scaled by diameter / wake_diameter
+    wake_coord_scale: float = 1.0  # extra factor: file coordinates * scale (* diameter / wake_diameter) = metres
     wake_velocity_normalised: bool = True  # True: file holds V/Vs
     wake_interp: str = "pchip"  # "pchip" or "linear"
 
@@ -102,6 +103,14 @@ class Case:
         return self.ctrl_sigma_D * self.diameter
 
     @property
+    def wake_scale(self) -> float:
+        """Factor from wake-file coordinates to metres in the simulation."""
+        scale = self.wake_coord_scale
+        if self.wake_diameter > 0:
+            scale *= self.diameter / self.wake_diameter
+        return scale
+
+    @property
     def wake_velocity_scale(self) -> float:
         return self.ship_speed if self.wake_velocity_normalised else 1.0
 
@@ -129,6 +138,8 @@ class Case:
     def validate(self) -> None:
         if self.diameter <= 0 or self.ship_speed <= 0 or self.density <= 0:
             raise ValueError("diameter, ship_speed and density must be positive")
+        if self.wake_diameter < 0 or self.wake_coord_scale <= 0:
+            raise ValueError("wake_diameter must be >= 0 and wake_coord_scale > 0")
         if self.crossflow not in ("inlet", "forces"):
             raise ValueError("crossflow must be 'inlet' or 'forces'")
         if self.wake_interp not in ("pchip", "linear"):

@@ -39,13 +39,13 @@ class Problem:
         wake_path = Path(case.wake_file)
         if not wake_path.is_absolute():
             wake_path = self.dir / wake_path
-        self.table = read_wake(wake_path, case.wake_coord_scale, case.wake_velocity_scale)
+        self.table = read_wake(wake_path, case.wake_scale, case.wake_velocity_scale)
         self.region = CostRegion.from_case(case, self.table)
         r_outer = case.ctrl_r_max_R * case.radius
         if self.region.r_max >= r_outer:
             raise ValueError(
                 f"the cost region reaches r = {self.region.r_max:.4g} m but the force disk only "
-                f"{r_outer:.4g} m; increase ctrl_r_max_R or check diameter / wake_coord_scale"
+                f"{r_outer:.4g} m; increase ctrl_r_max_R or check diameter / wake_diameter"
             )
         axial = np.array([case.ship_speed, 0.0, 0.0])
         mean = WakeField(self.table, axial, r_outer, case.wake_interp).disk_mean()

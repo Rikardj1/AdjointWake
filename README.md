@@ -51,7 +51,10 @@ component in the report.
 concentric rings around the shaft axis (see `examples/WakeEdStar.csv`: 6 rings
 of 31 points). X is the shaft axis pointing downstream. The file's axes are used
 as the simulation's laboratory axes, so there is no angle or sign convention to
-set. Coordinates are scaled to metres with `wake_coord_scale`; velocities are
+set. A file made for a propeller of diameter `wake_diameter` (e.g. 1.0 m, i.e.
+coordinates in units of D) is scaled by `diameter / wake_diameter`; with
+`wake_diameter = 0` the coordinates are in metres. `wake_coord_scale` is an extra
+factor (e.g. 0.001 for mm). Velocities are
 V/Vs when `wake_velocity_normalised = true`.
 
 ## Quick start
