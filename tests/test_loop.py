@@ -119,7 +119,11 @@ def test_report_writes_the_achieved_wake_in_the_input_format(case_dir):
     assert run(case_dir, "report") == 0
     names, achieved = read_table(case_dir / "wake_achieved.csv")
     _, wake = read_table(case_dir / "WakeEdStar.csv")
-    assert names == ["x", "y", "z", "vx", "vy", "vz"] and achieved.shape == wake.shape
+    assert names == ["x", "y", "z", "vx", "vy", "vz", "vt", "vr"] and achieved.shape == (len(wake), 8)
+    y, z, vy, vz, vt, vr = achieved[:, 1], achieved[:, 2], achieved[:, 4], achieved[:, 5], achieved[:, 6], achieved[:, 7]
+    r = np.hypot(y, z)  # theta from +Z towards +Y: e_r = (y, z)/r, e_t = (z, -y)/r
+    np.testing.assert_allclose(vr, (vy * y + vz * z) / r, atol=2e-6)
+    np.testing.assert_allclose(vt, (vy * z - vz * y) / r, atol=2e-6)
     np.testing.assert_allclose(np.sort(np.hypot(achieved[:, 1], achieved[:, 2])), np.sort(np.hypot(wake[:, 1], wake[:, 2])), atol=1e-5)
     assert np.sqrt(np.mean((np.sort(achieved[:, 3]) - np.sort(wake[:, 3])) ** 2)) < 0.05  # V/Vs, like the input
     assert 0.4 < achieved[:, 3].min() and achieved[:, 3].max() < 1.05
