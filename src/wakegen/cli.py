@@ -71,6 +71,11 @@ def cmd_info(args) -> int:
 
 def cmd_prepare(args) -> int:
     problem = _problem(args)
+    ratio = problem.table.r_max / problem.case.radius
+    if not 0.8 <= ratio <= 1.5 and not args.allow_scale:
+        print(f"ERROR: the outermost wake ring is at {ratio:.2f} R (expected about 1.0-1.2 R); check diameter "
+              f"and wake_coord_scale, or pass --allow-scale", file=sys.stderr)
+        return 2
     free = problem.freestream
     write_properties(problem.dir / "inlet.properties", {
         "inlet_vx": f"{free[0]:.9e}", "inlet_vy": f"{free[1]:.9e}", "inlet_vz": f"{free[2]:.9e}",
@@ -187,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
         p.set_defaults(func=func)
         if name == "prepare":
             p.add_argument("--start", choices=("analytic", "zero"), default="analytic")
+            p.add_argument("--allow-scale", action="store_true",
+                           help="run although the wake rings do not reach about R (diameter / wake_coord_scale)")
     p = sub.add_parser("apply")
     p.add_argument("--forces", default="wake_forces.json")
     p.add_argument("--cells", required=True, help="CSV with X, Y, Z, Volume of the cells around the force disk")
