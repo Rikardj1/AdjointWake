@@ -191,6 +191,12 @@ and runs `wakegen step --failed`, which rejects the trial and halves the step. A
 in a row, or if the starting point diverges, it stops. To skip a trial that already crashed a
 run, run `python -m wakegen step --failed --case case.properties` once before the restart.
 `coupled_cfl` from case.properties is also applied on a restart.
+
+Turbulence settings (applied on every start, also a restart): `max_tvr` (default 1e8; STAR's
+1e5 is too low at full scale, where nu_t/nu in the wake is 1e5-1e6), `kw_urf` and
+`kw_viscosity_urf` (empty = STAR default), and `freeze_turbulence` (keep k and omega from the
+first converged solve; this matches the frozen-turbulence adjoint and removes k-omega
+divergence, but the eddy viscosity no longer responds to the forces).
 The macro's own settings (domain, cell sizes, iterations) are at the end of
 `examples/case.properties`. `java/WakeLoop.java` is embedded in the macro: after changing it,
 run `python tools/embed_wakeloop.py`.
