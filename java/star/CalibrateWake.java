@@ -37,12 +37,14 @@ import star.vis.ThresholdMode;
  *   domain_inlet_D (-4), domain_outlet_D (4), domain_radius_D (3), side_boundary (symmetry | inlet),
  *   base_size_D (0.1), fine_size_D (0.02), coupled_cfl (20; also applied on a restart),
  *   coupled_cfl_min (2; floor when the CFL is halved after a diverged solve), viscosity (1.0e-3),
+ *   max_tvr (1e8), kw_urf, kw_viscosity_urf (empty = STAR default), freeze_turbulence (false);
+ *   see applyTurbulenceSettings,
  *   primal_min_iterations (300), primal_max_iterations (3000), primal_block (50),
  *   primal_tolerance (1e-5, relative change of J per block), primal_stable_blocks (3),
  *   adjoint_iterations (1000), max_solves (200), adjoint_ff_regex ((?i).*VelocityAdjoint.*).
  *
  * Log markers: WAKE_MESH, WAKE_PREPARED (from Python), WAKE_SOLVE, WAKE_ITER (from Python),
- * WAKE_ADJOINT_FF, WAKE_PRIMAL_FAILED + WAKE_RECOVER (a diverged line-search trial: the flow is
+ * WAKE_TURBULENCE, WAKE_ADJOINT_FF, WAKE_PRIMAL_FAILED + WAKE_RECOVER (a diverged line-search trial: the flow is
  * re-initialised and the optimiser takes a shorter step), WAKE_COMPLETE, WAKE_FAILED.
  *
  * Phase 0 (AdjointProbe, 2026-11-19) fixed: ReportCostFunction on a VolumeIntegralReport works,
@@ -64,6 +66,8 @@ public class CalibrateWake extends StarMacro {
     private ReportCostFunction costFunction;
     private FieldFunction adjointField;
     private int tableCount = 0;
+    private boolean freezeTurbulence = false;
+    private boolean turbulenceSolved = false;  // the current k-omega fields belong to a converged solve
     private Table forcesTable;
 
     private String text(String key, String def) {
@@ -141,6 +145,7 @@ public class CalibrateWake extends StarMacro {
         boolean resume = !sim.getRegionManager().getRegions().isEmpty();
         if (resume) {
             attach();
+            turbulenceSolved = sim.getSolution().isInitialized();
             if (cfg.containsKey("coupled_cfl")) {  // lets a restart run with a lower CFL
                 sim.getSolverManager().getSolver(star.coupledflow.CoupledImplicitSolver.class).setCFL(num("coupled_cfl", 20.0));
             }
@@ -157,6 +162,7 @@ public class CalibrateWake extends StarMacro {
             buildCost();
             sim.saveState(caseFile("calibration.sim").getPath());
         }
+        applyTurbulenceSettings();
         String message = loop.run(integer("max_solves", 200));
         sim.saveState(caseFile("calibration.sim").getPath());
         sim.println("WAKE_COMPLETE " + message);
@@ -476,6 +482,40 @@ public class CalibrateWake extends StarMacro {
     }
 
     /**
+     * Turbulence solver settings from case.properties, applied on every start (also a restart):
+     *   max_tvr (1e8): limit on the turbulent viscosity ratio. STAR's default 1e5 is too low at
+     *     full scale (nu_t/nu of a 6 m wake at 24 m/s is 1e5-1e6), and the limiter acting on
+     *     hundreds of thousands of cells can drive k-omega unstable.
+     *   kw_urf, kw_viscosity_urf (empty = STAR default): under-relaxation of k-omega and of nu_t.
+     *   freeze_turbulence (false): after the first converged flow solve, keep k and omega fixed.
+     *     The adjoint uses frozen turbulence anyway, so the gradient becomes exact and k-omega
+     *     cannot diverge; the eddy viscosity then no longer follows the forces.
+     */
+    private void applyTurbulenceSettings() {
+        star.kwturb.KwTurbViscositySolver viscosity = sim.getSolverManager().getSolver(star.kwturb.KwTurbViscositySolver.class);
+        viscosity.setMaxTvr(num("max_tvr", 1.0e8));
+        if (!text("kw_viscosity_urf", "").isEmpty()) {
+            viscosity.setViscosityUrf(num("kw_viscosity_urf", 1.0));
+        }
+        star.kwturb.KwTurbSolver kw = sim.getSolverManager().getSolver(star.kwturb.KwTurbSolver.class);
+        if (!text("kw_urf", "").isEmpty()) {
+            kw.setUrf(num("kw_urf", 0.8));
+        }
+        freezeTurbulence = Boolean.parseBoolean(text("freeze_turbulence", "false"));
+        if (!freezeTurbulence) {
+            setTurbulenceFrozen(false);  // a saved simulation may still have them frozen
+        }
+        sim.println("WAKE_TURBULENCE max_tvr=" + f(viscosity.getMaxTvr()) + " kw_urf=" + f(kw.getUrf())
+                + " viscosity_urf=" + f(viscosity.getViscosityUrf()) + " freeze_turbulence=" + freezeTurbulence);
+    }
+
+    /** Freeze or release the k-omega and turbulent-viscosity solvers. */
+    private void setTurbulenceFrozen(boolean frozen) {
+        sim.getSolverManager().getSolver(star.kwturb.KwTurbSolver.class).setFrozen(frozen);
+        sim.getSolverManager().getSolver(star.kwturb.KwTurbViscositySolver.class).setFrozen(frozen);
+    }
+
+    /**
      * A line-search trial diverged (e.g. non-finite k-omega residual). Clear the flow and adjoint
      * fields, re-initialise from the inflow, and lower the coupled CFL for the rest of the run
      * (halved, not below coupled_cfl_min). WakeLoop then rejects the trial and the optimiser
@@ -485,6 +525,8 @@ public class CalibrateWake extends StarMacro {
         Solution solution = sim.getSolution();
         solution.clearSolution(Solution.Clear.Fields, Solution.Clear.AdjointFlow);
         solution.initializeSolution();
+        setTurbulenceFrozen(false);  // k and omega were reset: solve them again once
+        turbulenceSolved = false;
         star.coupledflow.CoupledImplicitSolver coupled = sim.getSolverManager().getSolver(star.coupledflow.CoupledImplicitSolver.class);
         double cfl = Math.max(0.5 * coupled.getCFL(), num("coupled_cfl_min", 2.0));
         coupled.setCFL(cfl);
@@ -503,7 +545,11 @@ public class CalibrateWake extends StarMacro {
         }
 
         @Override protected void solvePrimal() {
+            if (freezeTurbulence) {
+                setTurbulenceFrozen(turbulenceSolved);
+            }
             CalibrateWake.this.solvePrimal();
+            turbulenceSolved = true;
         }
 
         @Override protected void exportAchieved() {
