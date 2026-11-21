@@ -105,6 +105,9 @@ def cmd_step(args) -> int:
         print(f"WAKE_STOP {opt.message}")
         return 0
 
+    if args.failed:
+        return _step_failed(problem, opt)
+
     fhat_trial = problem.fhat_from_x(opt.x_trial)
     value, cost_volume = problem.read_cost()
     total, reg, reg_grad = problem.total(value.total, fhat_trial)
@@ -135,6 +138,25 @@ def cmd_step(args) -> int:
         f"rms_a={rms[0]:.5f} rms_t={rms[1]:.5f} rms_r={rms[2]:.5f} next={opt.action}"
         + (f" ({opt.message})" if opt.action == "stop" else "")
     )
+    return 0
+
+
+def _step_failed(problem: Problem, opt: Lbfgs) -> int:
+    """The flow solve of a line-search trial failed (diverged): reject it and take a shorter step."""
+    if opt.action != "primal":
+        print(f"ERROR: --failed only applies to a line-search trial (action 'primal'), not '{opt.action}'", file=sys.stderr)
+        return 2
+    step_taken, accepted_before = opt.step, opt.iteration
+    opt.tell(float("inf"))
+    problem.write_forces_table(problem.fhat_from_x(opt.x_trial))
+    opt.save(problem.dir / STATE)
+    _write_action(problem, opt)
+    with (problem.dir / HISTORY).open("a", newline="", encoding="utf-8") as handle:
+        csv.writer(handle).writerow([
+            opt.evaluations, accepted_before, "primal_failed", "inf", "inf", "", "", "", "", f"{step_taken:.4e}", opt.action,
+        ])
+    print(f"WAKE_ITER {opt.iteration} solved=primal_failed step={step_taken:.4e} next={opt.action} step_next={opt.step:.4e}"
+          + (f" ({opt.message})" if opt.action == "stop" else ""))
     return 0
 
 
@@ -191,6 +213,9 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name)
         p.add_argument("--case", default="case.properties")
         p.set_defaults(func=func)
+        if name == "step":
+            p.add_argument("--failed", action="store_true",
+                           help="the flow solve of the current line-search trial diverged: reject it, shorter step")
         if name == "prepare":
             p.add_argument("--start", choices=("analytic", "zero"), default="analytic")
             p.add_argument("--allow-scale", action="store_true",

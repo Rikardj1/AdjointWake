@@ -25,6 +25,9 @@ import java.util.Properties;
  */
 public abstract class WakeLoop {
 
+    /** Failed primal solves in a row before the loop gives up. */
+    public static final int MAX_FAILURES_IN_ROW = 4;
+
     protected final File caseDir;
     protected final File caseFile;
     private final String python;
@@ -57,12 +60,23 @@ public abstract class WakeLoop {
     /** Write adjoint_cells.csv: X, Y, Z, Volume, adjoint momentum [i,j,k] of the control cells. */
     protected abstract void exportAdjoint() throws Exception;
 
+    /**
+     * Called when solvePrimal throws during a line-search trial (e.g. the flow diverged).
+     * Return true after making the solver usable again (for example by re-initialising the
+     * solution); the trial is then reported as failed and the optimiser takes a shorter step.
+     * Return false (the default) to stop with the error.
+     */
+    protected boolean recoverFromFailedPrimal(Exception error) throws Exception {
+        return false;
+    }
+
     protected void log(String line) {
         System.out.println(line);
     }
 
     /** Run until the optimiser says stop. Returns the optimiser's closing message. */
     public String run(int maxSolves) throws Exception {
+        int failuresInRow = 0;
         for (int solves = 0; ; solves++) {
             Properties next = readProperties("action.properties");
             String action = next.getProperty("action", "");
@@ -83,7 +97,19 @@ public abstract class WakeLoop {
             }
             if (primal) {
                 reloadForces();
-                solvePrimal();
+                try {
+                    solvePrimal();
+                } catch (Exception error) {
+                    // Only a line-search trial can be rejected; the starting point needs a converged flow.
+                    if (!action.equals("primal") || failuresInRow >= MAX_FAILURES_IN_ROW || !recoverFromFailedPrimal(error)) {
+                        throw error;
+                    }
+                    failuresInRow++;
+                    log("WAKE_PRIMAL_FAILED " + String.valueOf(error.getMessage()).split("\\R", 2)[0] + " (trial rejected, " + failuresInRow + " in a row)");
+                    wakegen("step", "--failed");
+                    continue;
+                }
+                failuresInRow = 0;
                 exportAchieved();
             }
             if (adjoint) {

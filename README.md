@@ -184,6 +184,13 @@ fine zone from the force disk to the propeller plane, writes the cell files, run
 prepare`, and then loops flow solve, adjoint solve and `wakegen step` until the optimiser stops;
 `wakegen report` writes the achieved wake. `history.csv` shows the progress. `calibration.sim`
 is saved after every adjoint solve; open it and run the macro again without `-new` to continue.
+
+If the flow solve of a line-search trial diverges (e.g. "non-finite residual (Sdr)"), the macro
+clears and re-initialises the solution, halves the coupled CFL (not below `coupled_cfl_min`),
+and runs `wakegen step --failed`, which rejects the trial and halves the step. After 4 failures
+in a row, or if the starting point diverges, it stops. To skip a trial that already crashed a
+run, run `python -m wakegen step --failed --case case.properties` once before the restart.
+`coupled_cfl` from case.properties is also applied on a restart.
 The macro's own settings (domain, cell sizes, iterations) are at the end of
 `examples/case.properties`. `java/WakeLoop.java` is embedded in the macro: after changing it,
 run `python tools/embed_wakeloop.py`.

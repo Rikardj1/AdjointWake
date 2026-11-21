@@ -35,13 +35,15 @@ import star.vis.ThresholdMode;
  * Keys read from case.properties besides the wakegen ones (all optional):
  *   python (python), wakegen_path (folder holding the wakegen package; empty = installed),
  *   domain_inlet_D (-4), domain_outlet_D (4), domain_radius_D (3), side_boundary (symmetry | inlet),
- *   base_size_D (0.1), fine_size_D (0.02), coupled_cfl (20), viscosity (1.0e-3),
+ *   base_size_D (0.1), fine_size_D (0.02), coupled_cfl (20; also applied on a restart),
+ *   coupled_cfl_min (2; floor when the CFL is halved after a diverged solve), viscosity (1.0e-3),
  *   primal_min_iterations (300), primal_max_iterations (3000), primal_block (50),
  *   primal_tolerance (1e-5, relative change of J per block), primal_stable_blocks (3),
  *   adjoint_iterations (1000), max_solves (200), adjoint_ff_regex ((?i).*VelocityAdjoint.*).
  *
  * Log markers: WAKE_MESH, WAKE_PREPARED (from Python), WAKE_SOLVE, WAKE_ITER (from Python),
- * WAKE_ADJOINT_FF, WAKE_COMPLETE, WAKE_FAILED.
+ * WAKE_ADJOINT_FF, WAKE_PRIMAL_FAILED + WAKE_RECOVER (a diverged line-search trial: the flow is
+ * re-initialised and the optimiser takes a shorter step), WAKE_COMPLETE, WAKE_FAILED.
  *
  * Phase 0 (AdjointProbe, 2026-11-19) fixed: ReportCostFunction on a VolumeIntegralReport works,
  * table targets work, dJ/df_cell = VelocityAdjoint * cell volume.
@@ -139,6 +141,9 @@ public class CalibrateWake extends StarMacro {
         boolean resume = !sim.getRegionManager().getRegions().isEmpty();
         if (resume) {
             attach();
+            if (cfg.containsKey("coupled_cfl")) {  // lets a restart run with a lower CFL
+                sim.getSolverManager().getSolver(star.coupledflow.CoupledImplicitSolver.class).setCFL(num("coupled_cfl", 20.0));
+            }
             sim.println("WAKE_RESUME continuing from " + caseFile("action.properties"));
         } else {
             buildPhysics();
@@ -470,6 +475,23 @@ public class CalibrateWake extends StarMacro {
         sim.println("WAKE_SOLVE adjoint " + adjointField.getFunctionName());
     }
 
+    /**
+     * A line-search trial diverged (e.g. non-finite k-omega residual). Clear the flow and adjoint
+     * fields, re-initialise from the inflow, and lower the coupled CFL for the rest of the run
+     * (halved, not below coupled_cfl_min). WakeLoop then rejects the trial and the optimiser
+     * shortens the step.
+     */
+    private boolean recoverFromFailedPrimal() {
+        Solution solution = sim.getSolution();
+        solution.clearSolution(Solution.Clear.Fields, Solution.Clear.AdjointFlow);
+        solution.initializeSolution();
+        star.coupledflow.CoupledImplicitSolver coupled = sim.getSolverManager().getSolver(star.coupledflow.CoupledImplicitSolver.class);
+        double cfl = Math.max(0.5 * coupled.getCFL(), num("coupled_cfl_min", 2.0));
+        coupled.setCFL(cfl);
+        sim.println("WAKE_RECOVER solution re-initialised, coupled CFL now " + f(cfl));
+        return true;
+    }
+
     /** WakeLoop with the STAR-CCM+ hooks. */
     private class StarLoop extends WakeLoop {
         StarLoop(File caseFile, String python, String pythonPath) {
@@ -497,6 +519,10 @@ public class CalibrateWake extends StarMacro {
             sim.saveState(caseFile("calibration.sim").getPath());
         }
 
+        @Override protected boolean recoverFromFailedPrimal(Exception error) {
+            return CalibrateWake.this.recoverFromFailedPrimal();
+        }
+
         @Override protected void log(String line) {
             sim.println(line);
         }
@@ -520,6 +546,9 @@ public class CalibrateWake extends StarMacro {
      *   stop:           reloadForces, solvePrimal, exportAchieved, then "report"
      */
     abstract static class WakeLoop {
+
+        /** Failed primal solves in a row before the loop gives up. */
+        public static final int MAX_FAILURES_IN_ROW = 4;
 
         protected final File caseDir;
         protected final File caseFile;
@@ -553,12 +582,23 @@ public class CalibrateWake extends StarMacro {
         /** Write adjoint_cells.csv: X, Y, Z, Volume, adjoint momentum [i,j,k] of the control cells. */
         protected abstract void exportAdjoint() throws Exception;
 
+        /**
+         * Called when solvePrimal throws during a line-search trial (e.g. the flow diverged).
+         * Return true after making the solver usable again (for example by re-initialising the
+         * solution); the trial is then reported as failed and the optimiser takes a shorter step.
+         * Return false (the default) to stop with the error.
+         */
+        protected boolean recoverFromFailedPrimal(Exception error) throws Exception {
+            return false;
+        }
+
         protected void log(String line) {
             System.out.println(line);
         }
 
         /** Run until the optimiser says stop. Returns the optimiser's closing message. */
         public String run(int maxSolves) throws Exception {
+            int failuresInRow = 0;
             for (int solves = 0; ; solves++) {
                 Properties next = readProperties("action.properties");
                 String action = next.getProperty("action", "");
@@ -579,7 +619,19 @@ public class CalibrateWake extends StarMacro {
                 }
                 if (primal) {
                     reloadForces();
-                    solvePrimal();
+                    try {
+                        solvePrimal();
+                    } catch (Exception error) {
+                        // Only a line-search trial can be rejected; the starting point needs a converged flow.
+                        if (!action.equals("primal") || failuresInRow >= MAX_FAILURES_IN_ROW || !recoverFromFailedPrimal(error)) {
+                            throw error;
+                        }
+                        failuresInRow++;
+                        log("WAKE_PRIMAL_FAILED " + String.valueOf(error.getMessage()).split("\\R", 2)[0] + " (trial rejected, " + failuresInRow + " in a row)");
+                        wakegen("step", "--failed");
+                        continue;
+                    }
+                    failuresInRow = 0;
                     exportAchieved();
                 }
                 if (adjoint) {
